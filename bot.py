@@ -7,6 +7,7 @@ import cv2
 import json
 import os
 import sys
+
 import ctypes
 import threading
 from ultralytics import YOLO
@@ -19,10 +20,8 @@ from PyQt6.QtGui import QColor
 # ==========================================
 # 1. KONFIGURACJA I INICJALIZACJA
 # ==========================================
-try:
-    ctypes.windll.user32.SetProcessDPIAware()
-except Exception:
-    pass
+
+os.environ["QT_LOGGING_RULES"] = "qt.qpa.window=false"
 pydirectinput.PAUSE = 0
 
 sciezka_konfiguracji = os.path.join("User Settings", "region_dywanu.json")
@@ -33,9 +32,17 @@ if not os.path.exists(sciezka_konfiguracji):
 with open(sciezka_konfiguracji, 'r') as plik:
     REGION_DYWANU = json.load(plik)
 
+sciezka_szablonu_json = os.path.join("User Settings", "region_szablonu.json")
+if not os.path.exists(sciezka_szablonu_json):
+    print("BŁĄD: Brak region_szablonu.json. Uruchom wybierak_obszaru.py")
+    sys.exit()
+
+with open(sciezka_szablonu_json, 'r') as plik:
+    REGION_SZABLONU = json.load(plik)
+
 sciezka_ustawien = os.path.join("User Settings", "settings.json")
 if not os.path.exists(sciezka_ustawien):
-    domyslne = {"klawisz_start": "e", "klawisz_pauza": "f8", "klawisz_stop": "f9"}
+    domyslne = {"klawisz_start": "e", "klawisz_pauza": "f8", "klawisz_stop": "f9", "monitor": 1}
     os.makedirs("User Settings", exist_ok=True)
     with open(sciezka_ustawien, 'w') as plik:
         json.dump(domyslne, plik, indent=4)
@@ -47,6 +54,7 @@ else:
 KLAWISZ_START = USTAWIENIA["klawisz_start"]
 KLAWISZ_PAUZA = USTAWIENIA["klawisz_pauza"]
 KLAWISZ_STOP = USTAWIENIA["klawisz_stop"]
+MONITOR_INDEX = USTAWIENIA.get("monitor", 1)
 
 sciezka_szablonu = os.path.join("Ressources", "szablon_postepu.png")
 sciezka_wydobycia = os.path.join("Ressources", "wydobycie.png")
@@ -64,8 +72,10 @@ print("Ładowanie sztucznej inteligencji...")
 model = YOLO('best.pt')
 print("Mózg załadowany pomyślnie!\n")
 
-sct = mss.mss()
-monitor_glowny = sct.monitors[1]
+pydirectinput.FAILSAFE = False
+
+sct = mss.MSS()
+monitor_glowny = sct.monitors[MONITOR_INDEX]
 
 # ==========================================
 # 2. ZMIENNE GLOBALNE DLA GUI I STANU
@@ -121,7 +131,7 @@ def bezpieczne_czekanie(czas_sekundy):
     return True
 
 def czy_minigra_aktywna():
-    zrzut = np.array(sct.grab(monitor_glowny))
+    zrzut = np.array(sct.grab(REGION_SZABLONU))
     ekran_bgr = cv2.cvtColor(zrzut, cv2.COLOR_BGRA2BGR)
     wynik = cv2.matchTemplate(ekran_bgr, szablon, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, _ = cv2.minMaxLoc(wynik)
@@ -163,21 +173,22 @@ def petla_bota():
             
             if uruchomienie_auto:
                 pydirectinput.press('e')
-                if not bezpieczne_czekanie(0.01): continue 
+                #if not bezpieczne_czekanie(0.01): continue 
 
             # --- KOPANIE ZŁOŻA ---
-            while not czy_minigra_aktywna():
+            while True:
                 if not dziala or spauzowany: break
-                    
                 pydirectinput.mouseDown()
                 if not bezpieczne_czekanie(0.05): break
                 pydirectinput.mouseUp()
                 if not bezpieczne_czekanie(0.02): break
+                if czy_minigra_aktywna():
+                    break
 
             if not dziala or spauzowany: continue
             
             # --- ZBIERANIE KAMIENI (MINIGRA) ---
-            if not bezpieczne_czekanie(0.01): continue
+            #if not bezpieczne_czekanie(0.01): continue
             ustaw_status("Minigra")
             
             while czy_minigra_aktywna():
@@ -185,13 +196,13 @@ def petla_bota():
                     
                 screenshot = np.array(sct.grab(REGION_DYWANU))
                 obraz_bgr = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
-                wyniki = model.predict(source=obraz_bgr, conf=0.55, verbose=False)
+                wyniki = model.predict(source=obraz_bgr, conf=0.70, verbose=False)
                 znalezione_kamienie = wyniki[0].boxes.xyxy.cpu().numpy()
                 
                 if len(znalezione_kamienie) > 0:
                     for box in znalezione_kamienie:
                         if not dziala or spauzowany: break
-                        
+                        if not czy_minigra_aktywna(): break
                         x1, y1, x2, y2 = box
                         srodek_x = int((x1 + x2) / 2 + REGION_DYWANU["left"])
                         srodek_y = int((y1 + y2) / 2 + REGION_DYWANU["top"])
