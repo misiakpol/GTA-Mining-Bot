@@ -28,10 +28,9 @@ if not os.path.exists(sciezka_konfiguracji):
 with open(sciezka_konfiguracji, 'r') as plik:
     REGION_DYWANU = json.load(plik)
 
-# --- Wczytanie i ewentualne generowanie ustawień klawiszy ---
+# --- Ustawienia klawiszy ---
 sciezka_ustawien = os.path.join("User Settings", "settings.json")
 if not os.path.exists(sciezka_ustawien):
-    print("[INFO] Brak pliku settings.json. Generuję domyślne ustawienia...")
     domyslne = {"klawisz_start": "e", "klawisz_pauza": "f8", "klawisz_stop": "f9"}
     os.makedirs("User Settings", exist_ok=True)
     with open(sciezka_ustawien, 'w') as plik:
@@ -45,13 +44,27 @@ KLAWISZ_START = USTAWIENIA["klawisz_start"]
 KLAWISZ_PAUZA = USTAWIENIA["klawisz_pauza"]
 KLAWISZ_STOP = USTAWIENIA["klawisz_stop"]
 
-# --- Wczytanie wzorca karteczki ---
+# --- Wczytanie wzorców obrazków (Szablon minigry i Ikona wydobycia) ---
 sciezka_szablonu = os.path.join("Ressources", "szablon_postepu.png")
+sciezka_wydobycia = os.path.join("Ressources", "wydobycie.png")
+
 if not os.path.exists(sciezka_szablonu):
-    print(f"BŁĄD: Brak pliku '{sciezka_szablonu}'. Zrób wycinek interfejsu i zapisz go w tym folderze!")
+    print(f"BŁĄD: Brak pliku '{sciezka_szablonu}'!")
+    sys.exit()
+if not os.path.exists(sciezka_wydobycia):
+    print(f"BŁĄD: Brak pliku '{sciezka_wydobycia}'!")
     sys.exit()
 
 szablon = cv2.imread(sciezka_szablonu, cv2.IMREAD_COLOR)
+szablon_wydobycia = cv2.imread(sciezka_wydobycia, cv2.IMREAD_COLOR)
+
+# --- Konfiguracja rejonu nasłuchu "Wydobycia" (Lewy górny róg) ---
+REGION_WYDOBYCIE = {
+    "top": 0,
+    "left": 0,
+    "width": 500,
+    "height": 100
+}
 
 # --- Ładowanie AI ---
 print("Ładowanie sztucznej inteligencji...")
@@ -62,13 +75,12 @@ sct = mss.mss()
 monitor_glowny = sct.monitors[1]
 
 # ==========================================
-# 2. FLAGI STERUJĄCE I ZDARZENIA (Z TŁA)
+# 2. FLAGI STERUJĄCE I ZDARZENIA
 # ==========================================
 dziala = True
 spauzowany = False
 
 def przelacz_pauze():
-    """Funkcja wywoływana natychmiast po wciśnięciu klawisza pauzy."""
     global spauzowany
     spauzowany = not spauzowany
     if spauzowany:
@@ -77,12 +89,10 @@ def przelacz_pauze():
         print(f"\n[WZNOWIONO] Skrypt kontynuuje pracę.")
 
 def zatrzymaj_bota():
-    """Funkcja wywoływana natychmiast po wciśnięciu klawisza stopu."""
     global dziala
     dziala = False
     print(f"\n[STOP] Otrzymano sygnał zatrzymania...")
 
-# Przypisanie klawiszy do funkcji działających w tle
 keyboard.add_hotkey(KLAWISZ_PAUZA, przelacz_pauze)
 keyboard.add_hotkey(KLAWISZ_STOP, zatrzymaj_bota)
 
@@ -90,12 +100,11 @@ keyboard.add_hotkey(KLAWISZ_STOP, zatrzymaj_bota)
 # 3. FUNKCJE POMOCNICZE
 # ==========================================
 def bezpieczne_czekanie(czas_sekundy):
-    """Zastępuje time.sleep(). Pozwala na natychmiastowe przerwanie czekania przez pauzę/stop."""
     start = time.time()
     while time.time() - start < czas_sekundy:
         if not dziala or spauzowany:
-            return False  # Zwraca False, jeśli w trakcie czekania wciśnięto pauzę/stop
-        time.sleep(0.01)  # Mikrouśpienie, żeby nie palić procesora
+            return False
+        time.sleep(0.01)
     return True
 
 def czy_minigra_aktywna():
@@ -104,6 +113,13 @@ def czy_minigra_aktywna():
     wynik = cv2.matchTemplate(ekran_bgr, szablon, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, _ = cv2.minMaxLoc(wynik)
     return max_val > 0.8
+
+def czy_widac_ikonke_wydobycia():
+    zrzut = np.array(sct.grab(REGION_WYDOBYCIE))
+    ekran_bgr = cv2.cvtColor(zrzut, cv2.COLOR_BGRA2BGR)
+    wynik = cv2.matchTemplate(ekran_bgr, szablon_wydobycia, cv2.TM_CCOEFF_NORMED)
+    _, max_val, _, _ = cv2.minMaxLoc(wynik)
+    return max_val > 0.75  # Tolerancja ustawiona na 75%
 
 def szybkie_klikniecie(x, y):
     pydirectinput.moveTo(x, y)
@@ -117,8 +133,9 @@ def szybkie_klikniecie(x, y):
 # 4. GŁÓWNA PĘTLA BOTA (Maszyna Stanów)
 # ==========================================
 print("=====================================================")
-print(" BOT GOTOWY DO PRACY!")
-print(f" -> Start cyklu: '{KLAWISZ_START.upper()}'")
+print(" BOT GOTOWY DO PRACY! WŁĄCZONY TRYB AUTO-WYDOBYCIA.")
+print(f" -> Bot sam rozpocznie pracę, gdy wykryje obrazek w lewym górnym rogu.")
+print(f" -> Możesz też wystartować ręcznie klawiszem: '{KLAWISZ_START.upper()}'")
 print(f" -> Pauza/Wznowienie: '{KLAWISZ_PAUZA.upper()}'")
 print(f" -> Wyłączenie: '{KLAWISZ_STOP.upper()}'")
 print("=====================================================")
@@ -130,22 +147,35 @@ while dziala:
         continue
 
     # --- STAN 1: CZUWANIE ---
-    if keyboard.is_pressed(KLAWISZ_START):
-        print("\n[ROZPOCZYNAM CYKL] Spamuję LPM...")
+    # Skanujemy w tle, dopóki gracz nie wciśnie startu LUB dopóki nie wykryjemy ikonki
+    uruchomienie_reczne = keyboard.is_pressed(KLAWISZ_START)
+    uruchomienie_auto = czy_widac_ikonke_wydobycia()
+
+    if uruchomienie_reczne or uruchomienie_auto:
+        
+        if uruchomienie_auto:
+            print("\n[AUTO-WYKRYCIE] Znalazłem ikonę wydobycia! Wciskam 'E'...")
+            pydirectinput.press('e')
+            # Krótka pauza, aby gra zdążyła schować ikonę i rozpocząć animację postaci
+            if not bezpieczne_czekanie(0.01): continue 
+        else:
+            print("\n[START RĘCZNY] Wciśnięto klawisz. Zaczynam pracę...")
+
+        print("[ROZPOCZYNAM CYKL] Spamuję LPM, czekam na dywan...")
         
         # --- STAN 2: KOPANIE ZŁOŻA ---
         while not czy_minigra_aktywna():
-            if not dziala or spauzowany: break # Natychmiastowe wyrzucenie z pętli
+            if not dziala or spauzowany: break
                 
             pydirectinput.mouseDown()
             if not bezpieczne_czekanie(0.05): break
             pydirectinput.mouseUp()
-            if not bezpieczne_czekanie(0.05): break
+            if not bezpieczne_czekanie(0.02): break
 
-        if not dziala or spauzowany: continue # Jeśli wyrzuciło nas przez pauzę, wracamy na początek
+        if not dziala or spauzowany: continue
         
         print("\n[WYKRYTO MINIGRĘ!] Przerywam kopanie, ładuję snajpera.")
-        if not bezpieczne_czekanie(0.15): continue
+        if not bezpieczne_czekanie(0.01): continue
         
         # --- STAN 3: ZBIERANIE KAMIENI ---
         while czy_minigra_aktywna():
@@ -160,7 +190,7 @@ while dziala:
             if len(znalezione_kamienie) > 0:
                 print(f"YOLO namierzyło {len(znalezione_kamienie)} celów. Odklikuję...")
                 for box in znalezione_kamienie:
-                    if not dziala or spauzowany: break # Przerywamy nawet w trakcie klikania serii
+                    if not dziala or spauzowany: break
                     
                     x1, y1, x2, y2 = box
                     srodek_x = int((x1 + x2) / 2 + REGION_DYWANU["left"])
@@ -172,7 +202,7 @@ while dziala:
             if not bezpieczne_czekanie(0.3): break
             
         if dziala and not spauzowany:
-            print("[CYKL ZAKOŃCZONY] Minigra zniknęła. Czekam na start...")
-            bezpieczne_czekanie(1) # Zabezpieczenie przed trzymaniem klawisza
+            print("[CYKL ZAKOŃCZONY] Minigra zniknęła. Wracam do czuwania...")
+            bezpieczne_czekanie(1.5) # Zabezpieczenie przed podwójnym odpaleniem na tym samym zwoju
 
 print("\nBot został całkowicie wyłączony. Do zobaczenia!")
