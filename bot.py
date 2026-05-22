@@ -7,8 +7,7 @@ import cv2
 import json
 import os
 import sys
-
-import ctypes
+import winsound
 import threading
 from ultralytics import YOLO
 
@@ -55,6 +54,7 @@ KLAWISZ_START = USTAWIENIA["klawisz_start"]
 KLAWISZ_PAUZA = USTAWIENIA["klawisz_pauza"]
 KLAWISZ_STOP = USTAWIENIA["klawisz_stop"]
 MONITOR_INDEX = USTAWIENIA.get("monitor", 1)
+ODTWARZAJ_DZWIEK = USTAWIENIA.get("odtwarzaj_dzwiek", False)
 
 sciezka_szablonu = os.path.join("Ressources", "szablon_postepu.png")
 sciezka_wydobycia = os.path.join("Ressources", "wydobycie.png")
@@ -173,7 +173,7 @@ def petla_bota():
             
             if uruchomienie_auto:
                 pydirectinput.press('e')
-                #if not bezpieczne_czekanie(0.01): continue 
+                if not bezpieczne_czekanie(0.08): continue 
 
             # --- KOPANIE ZŁOŻA ---
             while True:
@@ -189,6 +189,8 @@ def petla_bota():
             
             # --- ZBIERANIE KAMIENI (MINIGRA) ---
             #if not bezpieczne_czekanie(0.01): continue
+            if ODTWARZAJ_DZWIEK:
+                winsound.Beep(400, 150)
             ustaw_status("Minigra")
             
             while czy_minigra_aktywna():

@@ -1,6 +1,7 @@
 {
-  "klawisz_start": "e",
-  "klawisz_pauza": "f10",
-  "klawisz_stop": "f9",
-  "monitor": 1
+    "klawisz_start": "e",
+    "klawisz_pauza": "f10",
+    "klawisz_stop": "f9",
+    "monitor": 1,
+    "odtwarzaj_dzwiek": true
 }
