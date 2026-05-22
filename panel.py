@@ -164,14 +164,27 @@ class PanelSterowania(QWidget):
     # LOGIKA I OBSŁUGA PLIKÓW / PROCESÓW
     # ==========================================
     def wczytaj_ustawienia(self):
-        if os.path.exists(SCIEZKA_USTAWIEN):
-            with open(SCIEZKA_USTAWIEN, 'r') as plik:
-                dane = json.load(plik)
-                self.input_start.setText(str(dane.get("klawisz_start", "e")))
-                self.input_pauza.setText(str(dane.get("klawisz_pauza", "f8")))
-                self.input_stop.setText(str(dane.get("klawisz_stop", "f9")))
-                self.input_monitor.setText(str(dane.get("monitor", 1)))
-                self.chk_dzwiek.setChecked(dane.get("odtwarzaj_dzwiek", False))
+        #Jeśli plik nie istnieje (pierwsze uruchomienie), stwórz go z domyślnymi wartościami
+        if not os.path.exists(SCIEZKA_USTAWIEN):
+            domyslne = {
+                "klawisz_start": "e",
+                "klawisz_pauza": "f8",
+                "klawisz_stop": "f9",
+                "monitor": 1,
+                "odtwarzaj_dzwiek": False
+            }
+            os.makedirs("User Settings", exist_ok=True)
+            with open(SCIEZKA_USTAWIEN, 'w') as plik:
+                json.dump(domyslne, plik, indent=4)
+                
+        # Jeżeli istnieje; odczytujemy go do panelu:
+        with open(SCIEZKA_USTAWIEN, 'r') as plik:
+            dane = json.load(plik)
+            self.input_start.setText(str(dane.get("klawisz_start", "e")))
+            self.input_pauza.setText(str(dane.get("klawisz_pauza", "f8")))
+            self.input_stop.setText(str(dane.get("klawisz_stop", "f9")))
+            self.input_monitor.setText(str(dane.get("monitor", 1)))
+            self.chk_dzwiek.setChecked(dane.get("odtwarzaj_dzwiek", False))
 
     def zapisz_ustawienia(self):
         nowe_ustawienia = {

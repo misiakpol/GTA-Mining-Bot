@@ -24,5 +24,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='GTA_V_Bot_Pack'
+    name='GTA_V_Bot_V'
 )

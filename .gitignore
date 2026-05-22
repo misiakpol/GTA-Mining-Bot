@@ -5,3 +5,5 @@
 /dist
 bot.spec
 region_dywan.spec
+__pycache__
+/Kompilacja
