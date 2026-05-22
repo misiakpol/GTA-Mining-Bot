@@ -203,6 +203,7 @@ def petla_bota():
                 
                 if len(znalezione_kamienie) > 0:
                     for box in znalezione_kamienie:
+                        print(f"[AI] Wykryte kamienie: {len(znalezione_kamienie)}")
                         if not dziala or spauzowany: break
                         if not czy_minigra_aktywna(): break
                         x1, y1, x2, y2 = box
