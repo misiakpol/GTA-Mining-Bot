@@ -192,7 +192,9 @@ def petla_bota():
             if ODTWARZAJ_DZWIEK:
                 winsound.Beep(400, 150)
             ustaw_status("Minigra")
-            
+
+            ostatnia_liczba_kamieni = -1
+
             while czy_minigra_aktywna():
                 if not dziala or spauzowany: break
                     
@@ -201,11 +203,18 @@ def petla_bota():
                 wyniki = model.predict(source=obraz_bgr, conf=0.70, verbose=False)
                 znalezione_kamienie = wyniki[0].boxes.xyxy.cpu().numpy()
                 
-                if len(znalezione_kamienie) > 0:
+                aktualna_liczba = len(znalezione_kamienie)
+        
+                if aktualna_liczba > 0:
+                    # Wypisz printa tylko, jeśli liczba kamieni się zmieniła
+                    if aktualna_liczba != ostatnia_liczba_kamieni:
+                        print(f"[AI] Pozostało kamieni do zebrania: {aktualna_liczba}")
+                        ostatnia_liczba_kamieni = aktualna_liczba
+                        
                     for box in znalezione_kamienie:
-                        print(f"[AI] Wykryte kamienie: {len(znalezione_kamienie)}")
                         if not dziala or spauzowany: break
                         if not czy_minigra_aktywna(): break
+                        
                         x1, y1, x2, y2 = box
                         srodek_x = int((x1 + x2) / 2 + REGION_DYWANU["left"])
                         srodek_y = int((y1 + y2) / 2 + REGION_DYWANU["top"])
