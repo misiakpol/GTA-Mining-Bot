@@ -5,7 +5,7 @@ import subprocess
 from PyQt6.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, 
                              QLineEdit, QPlainTextEdit, QHBoxLayout, 
                              QVBoxLayout, QGroupBox, QMessageBox, QCheckBox)
-from PyQt6.QtCore import Qt, QProcess, QObject, pyqtSignal
+from PyQt6.QtCore import Qt, QProcess, QObject, pyqtSignal, QProcessEnvironment
 from PyQt6.QtGui import QIcon
 
 # Ścieżka do ustawień
@@ -212,6 +212,9 @@ class PanelSterowania(QWidget):
         if self.proces_bota is None:
             self.loguj("[SYSTEM] Uruchamianie bota w tle...")
             self.proces_bota = QProcess()
+            srodowisko = QProcessEnvironment.systemEnvironment()
+            srodowisko.insert("PYTHONUNBUFFERED", "1")
+            self.proces_bota.setProcessEnvironment(srodowisko)
             self.proces_bota.readyReadStandardOutput.connect(self.obsluga_outputu_bota)
             self.proces_bota.readyReadStandardError.connect(self.obsluga_bledow_bota)
             self.proces_bota.finished.connect(self.bot_zakonczyl)
