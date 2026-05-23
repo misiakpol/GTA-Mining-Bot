@@ -115,6 +115,9 @@ class PanelSterowania(QWidget):
         self.chk_dzwiek = QCheckBox("Odtwórz dźwięk po wydobyciu kamienia")
         self.chk_dzwiek.setStyleSheet("margin-top: 5px; margin-bottom: 5px;")
         uklad_ustawien.addWidget(self.chk_dzwiek)
+        self.chk_chodzenie = QCheckBox("Auto-Walk")
+        self.chk_chodzenie.setStyleSheet("margin-top: 5px; margin-bottom: 5px;")
+        uklad_ustawien.addWidget(self.chk_chodzenie)
 
         # Przycisk zapisu
         self.btn_zapisz = QPushButton("Zapisz Ustawienia")
@@ -171,7 +174,8 @@ class PanelSterowania(QWidget):
                 "klawisz_pauza": "f8",
                 "klawisz_stop": "f9",
                 "monitor": 1,
-                "odtwarzaj_dzwiek": False
+                "odtwarzaj_dzwiek": False,
+                "auto_chodzenie": False
             }
             os.makedirs("User Settings", exist_ok=True)
             with open(SCIEZKA_USTAWIEN, 'w') as plik:
@@ -185,6 +189,7 @@ class PanelSterowania(QWidget):
             self.input_stop.setText(str(dane.get("klawisz_stop", "f9")))
             self.input_monitor.setText(str(dane.get("monitor", 1)))
             self.chk_dzwiek.setChecked(dane.get("odtwarzaj_dzwiek", False))
+            self.chk_chodzenie.setChecked(dane.get("auto_chodzenie", False))
 
     def zapisz_ustawienia(self):
         nowe_ustawienia = {
@@ -192,7 +197,8 @@ class PanelSterowania(QWidget):
             "klawisz_pauza": self.input_pauza.text().strip(),
             "klawisz_stop": self.input_stop.text().strip(),
             "monitor": int(self.input_monitor.text().strip() if self.input_monitor.text().isdigit() else 1),
-            "odtwarzaj_dzwiek": self.chk_dzwiek.isChecked()
+            "odtwarzaj_dzwiek": self.chk_dzwiek.isChecked(),
+            "auto_chodzenie": self.chk_chodzenie.isChecked()
         }
         os.makedirs("User Settings", exist_ok=True)
         with open(SCIEZKA_USTAWIEN, 'w') as plik:

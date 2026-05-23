@@ -3,5 +3,6 @@
     "klawisz_pauza": "f10",
     "klawisz_stop": "f9",
     "monitor": 1,
-    "odtwarzaj_dzwiek": true
+    "odtwarzaj_dzwiek": true,
+    "auto_chodzenie": true
 }

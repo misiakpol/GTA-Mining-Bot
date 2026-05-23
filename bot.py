@@ -10,8 +10,6 @@ import sys
 import winsound
 import threading
 from ultralytics import YOLO
-
-# Nowe, profesjonalne biblioteki do GUI
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QFrame, QHBoxLayout, QVBoxLayout, QGraphicsDropShadowEffect
 from PyQt6.QtCore import Qt, QTimer, QPoint
 from PyQt6.QtGui import QColor
@@ -25,7 +23,7 @@ pydirectinput.PAUSE = 0
 
 sciezka_konfiguracji = os.path.join("User Settings", "region_dywanu.json")
 if not os.path.exists(sciezka_konfiguracji):
-    print("BŁĄD: Brak region_dywanu.json. Uruchom wybierak_obszaru.py")
+    print("BŁĄD: Brak region_dywanu.json. Uruchom wybierak_obszaru.py", flush=True)
     sys.exit()
 
 with open(sciezka_konfiguracji, 'r') as plik:
@@ -33,7 +31,7 @@ with open(sciezka_konfiguracji, 'r') as plik:
 
 sciezka_szablonu_json = os.path.join("User Settings", "region_szablonu.json")
 if not os.path.exists(sciezka_szablonu_json):
-    print("BŁĄD: Brak region_szablonu.json. Uruchom wybierak_obszaru.py")
+    print("BŁĄD: Brak region_szablonu.json. Uruchom wybierak_obszaru.py", flush=True)
     sys.exit()
 
 with open(sciezka_szablonu_json, 'r') as plik:
@@ -55,12 +53,13 @@ KLAWISZ_PAUZA = USTAWIENIA["klawisz_pauza"]
 KLAWISZ_STOP = USTAWIENIA["klawisz_stop"]
 MONITOR_INDEX = USTAWIENIA.get("monitor", 1)
 ODTWARZAJ_DZWIEK = USTAWIENIA.get("odtwarzaj_dzwiek", False)
+AUTO_CHODZENIE = USTAWIENIA.get("auto_chodzenie", False)
 
 sciezka_szablonu = os.path.join("Ressources", "szablon_postepu.png")
 sciezka_wydobycia = os.path.join("Ressources", "wydobycie.png")
 
 if not os.path.exists(sciezka_szablonu) or not os.path.exists(sciezka_wydobycia):
-    print("BŁĄD: Brak plików graficznych w folderze Ressources!")
+    print("BŁĄD: Brak plików graficznych w folderze Ressources!", flush=True)
     sys.exit()
 
 szablon = cv2.imread(sciezka_szablonu, cv2.IMREAD_COLOR)
@@ -68,9 +67,9 @@ szablon_wydobycia = cv2.imread(sciezka_wydobycia, cv2.IMREAD_COLOR)
 
 REGION_WYDOBYCIE = {"top": 0, "left": 0, "width": 500, "height": 100}
 
-print("Ładowanie sztucznej inteligencji...")
+print("Ładowanie sztucznej inteligencji...", flush=True)
 model = YOLO('best.pt')
-print("Mózg załadowany pomyślnie!\n")
+print("Mózg załadowany pomyślnie!\n", flush=True)
 
 pydirectinput.FAILSAFE = False
 
@@ -108,17 +107,17 @@ def przelacz_pauze():
     ustaw_status(zapisany_tekst, zapisany_kolor) 
     
     if spauzowany:
-        print(f"\n[PAUZA] Wstrzymano. Naciśnij '{KLAWISZ_PAUZA}', aby wznowić.")
+        print(f"\n[PAUZA] Wstrzymano. Naciśnij '{KLAWISZ_PAUZA}', aby wznowić.", flush=True)
     else:
-        print(f"\n[WZNOWIONO] Kontynuacja pracy.")
+        print(f"\n[WZNOWIONO] Kontynuacja pracy.", flush=True)
 
 def zatrzymaj_bota():
     global dziala
     dziala = False
-    print(f"\n[STOP] Otrzymano sygnał zatrzymania...")
+    print(f"\n[STOP] Otrzymano sygnał zatrzymania...", flush=True)
 
-keyboard.add_hotkey(KLAWISZ_PAUZA, przelacz_pauze)
-keyboard.add_hotkey(KLAWISZ_STOP, zatrzymaj_bota)
+keyboard.on_press_key(KLAWISZ_PAUZA, lambda event: przelacz_pauze())
+keyboard.on_press_key(KLAWISZ_STOP, lambda event: zatrzymaj_bota())
 
 # ==========================================
 # 3. FUNKCJE POMOCNICZE BOTA
@@ -157,25 +156,71 @@ def szybkie_klikniecie(x, y):
 # ==========================================
 def petla_bota():
     global dziala
-    print("Bot uruchomiony w tle.")
+    print("Bot uruchomiony w tle.", flush=True)
     ustaw_status("Szukam")
     
+    biegnie = False # Flaga Maszyny Stanów
+    wymus_kopanie = False # Flaga ułatwiająca płynne przejście między biegiem a kopaniem
+    
     while dziala:
-        if spauzowany:
+        # --- BŁYSKAWICZNA OBSŁUGA PAUZY / STOPU ---
+        if not dziala or spauzowany:
+            if biegnie:
+                # Puść klawisze ZAWSZE, gdy bot zostaje przerwany w trakcie biegu
+                pydirectinput.keyUp('w')
+                pydirectinput.keyUp('shift')
+                biegnie = False
+                print("[SYSTEM] Bieg przerwany (Pauza/Stop).", flush=True)
+            
+            if not dziala: break
             time.sleep(0.1)
             continue
 
+        # --- STAN 1: BIEG W POSZUKIWANIU NOWEJ SKAŁY ---
+        if biegnie:
+            # Używamy spamu zamiast keyDown, żeby nie zablokować nasłuchu z keyboard.add_hotkey!
+            # Dodatkowo, jeśli spauzujesz podczas biegu, pętla natychmiast puści klawisze wyżej.
+            pydirectinput.keyDown('shift')
+            pydirectinput.keyDown('w')
+            
+            if czy_widac_ikonke_wydobycia():
+                print("[SYSTEM] Znalazłem nową skałę! Zatrzymuję bieg.", flush=True)
+                pydirectinput.keyUp('w')
+                pydirectinput.keyUp('shift')
+                biegnie = False
+                
+                # Złapanie skały przez wciśnięcie 'E'
+                pydirectinput.press('e')
+                bezpieczne_czekanie(0.08) # Czas na wejście postaci w animację skały
+                
+                # [POPRAWKA] Od razu przekazujemy pętli informację, żeby w Stanie 2 zaczęła kopać,
+                # zamiast liczyć na to, że ikonka wydobycia dalej tam jest.
+                wymus_kopanie = True 
+            else:
+                bezpieczne_czekanie(0.05)
+                # Ważne: puszczamy na ułamek sekundy, by Windows przetrawił inne procesy (np. klawisze)
+                pydirectinput.keyUp('w') 
+                pydirectinput.keyUp('shift')
+            continue
+
+        # --- STAN 2: SZUKANIE / OCZEKIWANIE NA KOPANIE ---
         uruchomienie_reczne = keyboard.is_pressed(KLAWISZ_START)
         uruchomienie_auto = czy_widac_ikonke_wydobycia()
 
-        if uruchomienie_reczne or uruchomienie_auto:
+        # Jeśli zaczęliśmy z ręki, z automatu (obrazek), albo postać właśnie podbiegła do złoża
+        if uruchomienie_reczne or uruchomienie_auto or wymus_kopanie:
             ustaw_status("Wydobywam")
             
+            # Resetujemy wymuszenie po wejściu do kopania
+            wymus_kopanie = False 
+            
+            # Wciskamy E tylko przy ręcznym/automatycznym rozpoznaniu, bez wymuszenia
             if uruchomienie_auto:
                 pydirectinput.press('e')
                 if not bezpieczne_czekanie(0.08): continue 
 
-            # --- KOPANIE ZŁOŻA ---
+            # --- KOPANIE ZŁOŻA (Spam LPM) ---
+            # Tutaj pętla bezpiecznie reaguje na Stop/Pauzę, bo używamy Twojego 'bezpieczne_czekanie'
             while True:
                 if not dziala or spauzowany: break
                 pydirectinput.mouseDown()
@@ -185,10 +230,10 @@ def petla_bota():
                 if czy_minigra_aktywna():
                     break
 
+            # Jeśli zatrzymaliśmy na etapie kopania, przeskakujemy minigrę i wracamy na górę
             if not dziala or spauzowany: continue
             
-            # --- ZBIERANIE KAMIENI (MINIGRA) ---
-            #if not bezpieczne_czekanie(0.01): continue
+            # --- STAN 3: ZBIERANIE KAMIENI (MINIGRA AI) ---
             if ODTWARZAJ_DZWIEK:
                 winsound.Beep(400, 150)
             ustaw_status("Minigra")
@@ -206,9 +251,8 @@ def petla_bota():
                 aktualna_liczba = len(znalezione_kamienie)
         
                 if aktualna_liczba > 0:
-                    # Wypisz printa tylko, jeśli liczba kamieni się zmieniła
                     if aktualna_liczba != ostatnia_liczba_kamieni:
-                        print(f"[AI] Pozostało kamieni do zebrania: {aktualna_liczba}")
+                        print(f"[AI] Pozostało kamieni do zebrania: {aktualna_liczba}", flush=True)
                         ostatnia_liczba_kamieni = aktualna_liczba
                         
                     for box in znalezione_kamienie:
@@ -222,14 +266,23 @@ def petla_bota():
                 
                 if not bezpieczne_czekanie(0.3): break
                 
+            # --- KONIEC WYDOBYCIA - DECYZJA CO DALEJ ---
             if dziala and not spauzowany:
                 ustaw_status("Szukam")
-                bezpieczne_czekanie(1.5)
+                
+                if AUTO_CHODZENIE:
+                    print("[SYSTEM] Złoże wyczerpane. Uruchamiam auto-walk (Shift+W)...", flush=True)
+                    bezpieczne_czekanie(0.02) # Czekamy aż postać wyprostuje się po minigrze
+                    
+                    # Włączamy flagę bez wciskania na stałe - Stan 1 zajmie się mechaniką trzymania w następnym cyklu
+                    biegnie = True 
+                else:
+                    bezpieczne_czekanie(0.02)
                 
         # Zabezpieczenie przed przegrzaniem procesora w pętli czuwania
         time.sleep(0.05)
 
-    print("\nBot zakończył pracę.")
+    print("\nBot zakończył pracę.", flush=True)
 
 # Uruchamiamy logikę bota w osobnym wątku
 watek_bota = threading.Thread(target=petla_bota, daemon=True)
@@ -334,6 +387,8 @@ class StatusOverlay(QWidget):
 # 6. START APLIKACJI
 # ==========================================
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
     app = QApplication(sys.argv)
     okno = StatusOverlay()
     okno.show()
