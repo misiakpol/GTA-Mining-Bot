@@ -198,9 +198,6 @@ def petla_bota():
                 wymus_kopanie = True 
             else:
                 bezpieczne_czekanie(0.05)
-                # Ważne: puszczamy na ułamek sekundy, by Windows przetrawił inne procesy (np. klawisze)
-                pydirectinput.keyUp('w') 
-                pydirectinput.keyUp('shift')
             continue
 
         # --- STAN 2: SZUKANIE / OCZEKIWANIE NA KOPANIE ---
