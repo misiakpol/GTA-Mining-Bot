@@ -2,10 +2,16 @@
 
 block_cipher = None
 
+common_datas = [
+    ('best.pt', '.'),
+    ('ikona.ico', '.'),
+    ('Ressources', 'Ressources'),
+]
+
 # Analiza kodu źródłowego dla każdego z 3 skryptów
-a = Analysis(['panel.py'], pathex=[], binaries=[], datas=[], hiddenimports=[], hookspath=[], runtime_hooks=[], excludes=[], cipher=block_cipher)
-b = Analysis(['bot.py'], pathex=[], binaries=[], datas=[], hiddenimports=[], hookspath=[], runtime_hooks=[], excludes=[], cipher=block_cipher)
-c = Analysis(['wybierak_obszaru.py'], pathex=[], binaries=[], datas=[], hiddenimports=[], hookspath=[], runtime_hooks=[], excludes=[], cipher=block_cipher)
+a = Analysis(['panel.py'], pathex=[], binaries=[], datas=common_datas, hiddenimports=[], hookspath=[], runtime_hooks=[], excludes=[], cipher=block_cipher)
+b = Analysis(['bot.py'], pathex=[], binaries=[], datas=common_datas, hiddenimports=[], hookspath=[], runtime_hooks=[], excludes=[], cipher=block_cipher)
+c = Analysis(['wybierak_obszaru.py'], pathex=[], binaries=[], datas=common_datas, hiddenimports=[], hookspath=[], runtime_hooks=[], excludes=[], cipher=block_cipher)
 
 pyz_a = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 pyz_b = PYZ(b.pure, b.zipped_data, cipher=block_cipher)
